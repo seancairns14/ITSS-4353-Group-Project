@@ -1,0 +1,130 @@
+---
+title: "Breast Cancer Diagnosis using Classification"
+author: "Sean Cairns"
+date: "2023-11-16"
+output:
+  word_document: default
+---
+
+
+## Introduction 
+
+
+## Data Exploration
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(readr)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(ggplot2)
+```
+
+
+```{r summary, echo=FALSE}
+data <- read.csv("FNA_cancer.csv")
+# The FNA cancer data
+dimensions <- dim(data)
+print(paste("Data Dimensions: Rows =", dimensions[1], ", Columns =", dimensions[2]))
+```
+
+## Shuffling the data
+
+```{r info, echo=TRUE}
+
+# shuffle the data
+set.seed(100)
+shuffle_index <- sample(1:nrow(data))
+data <- data[shuffle_index, ]
+head(data)
+```
+## Cleaning the data
+```{r cleaning, echo=TRUE}
+# Drop unwanted variable(s) and null values
+data <- data %>% select(-c(X)) %>%
+na.omit()
+head(data)
+```
+```{r cor, echo=TRUE}
+data_heatmap <- data$diagnosis
+data_heatmap
+
+```
+# Training the Decision Tree Model 
+```{r model1, echo=TRUE}
+# List of parameters
+ctrl <- trainControl(method = "cv", 
+                     number = 10, 
+                     search = "random", 
+                     verboseIter = FALSE, 
+                     classProbs = TRUE
+                     )
+
+# List of hyper parameters to loop through
+hyper_grid <- expand.grid(
+  cp = runif(100, min = 0.01, max = 0.5)
+)
+
+
+# Training model
+dt_model <- train(
+  diagnosis ~ .,
+  data = train_data, # Need to recombine features and target for gridsearch
+  method = "rpart",
+  trControl = ctrl,
+  tuneGrid = hyper_grid
+  
+)
+print(dt_model)
+
+```
+
+```{r bestmodel, echo=TRUE}
+# Getting best model
+best_model <- dt_model$finalModel
+# Plotting model
+rpart.plot(best_model, extra = 105)
+```
+## Showing Feature Importance
+```{r featureimport, echo=FALSE}
+feature_importance <- varImp(dt_model)
+print(feature_importance)
+```
+
+## Predict testing Data Based off of Training Model
+```{r confmatrix, echo=TRUE}
+# Predicting new data to see performance
+predictions <- predict(best_model, newdata = test_data, type= 'class')
+
+# Reformatting data to fit confusion matrix
+actual_labels <- factor(test_data$diagnosis, levels = c("B", "M"))
+predicted_labels <- factor(predictions, levels = c("B", "M"))
+
+# Creating confusion matrix
+conf_mat <- confusionMatrix(data = predicted_labels, reference = actual_labels)
+
+cm = as.data.frame(conf_mat$table)
+
+ggplot(data = cm, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), vjust = 1) +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix") +
+  scale_fill_gradient(low = "white", high = "green") +  # Adjust colors as needed
+  theme_minimal()
+
+```
+
+
+```{r featureimportance, echo=TRUE}
+
+importance <- varImp(best_model)
+
+# Create a bar plot using ggplot2 for feature importance
+ggplot(importance, y = Importance) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(x = "Features", y = "Importance Score", title = "Feature Importance") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+```

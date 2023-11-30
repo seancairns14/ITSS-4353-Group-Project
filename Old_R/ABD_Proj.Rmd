@@ -1,0 +1,203 @@
+---
+title: "Breast Cancer Diagnosis using Classification"
+author: "Sean Cairns"
+date: "2023-11-16"
+output:
+  word_document: default
+---
+
+
+## Introduction 
+
+
+## Data Exploration
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(readr)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(reshape2)
+```
+
+
+```{r summary, echo=FALSE}
+data <- read.csv("FNA_cancer.csv")
+# The FNA cancer data
+dimensions <- dim(data)
+print(paste("Data Dimensions: Rows =", dimensions[1], ", Columns =", dimensions[2]))
+```
+
+## Shuffling the data
+
+```{r info, echo=TRUE}
+
+# shuffle the data
+set.seed(100)
+shuffle_index <- sample(1:nrow(data))
+data <- data[shuffle_index, ]
+head(data)
+```
+```{r diagnosis plot, echo=TRUE, fig.height=5, fig.width=5}
+
+diagnosis_plot <- ggplot(data, aes(x = diagnosis)) +
+  geom_bar(fill = "skyblue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white")) +
+  labs(title = "Diagnosis Results",
+       x = "Type",
+       y = "Count")
+ggsave("./Images/Diagnosis.png", plot = diagnosis_plot, width = 8, height = 6, dpi = 300)
+
+diagnosis_plot
+
+```
+
+## Cleaning the data
+```{r cleaning, echo=TRUE}
+# Drop unwanted variable(s) and null values
+data <- data %>% select(-c(X)) %>%
+na.omit()
+head(data)
+```
+```{r cor, echo=TRUE, fig.height=10, fig.width=10}
+
+heatmap_data <- data[, -which(names(data) == 'diagnosis')]
+cor_mat <- melt(cor(heatmap_data))
+
+cor_heatmap <- ggplot(cor_mat, aes(Var1, Var2, fill = value)) +
+  geom_tile() + 
+  scale_fill_gradient(low='white', high = "red") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white")) + 
+  labs(title = "Correlation Heatmap between FNA_Cancer Variables",
+       x = "Variables",
+       y = "Variables")
+ggsave("cor_heatmap.png", plot = cor_heatmap, width = 8, height = 6, dpi = 300)
+
+cor_heatmap
+```
+
+
+## Creating the train and test set
+```{r splitting, echo=TRUE}
+
+target <- data$diagnosis
+train_indices <- createDataPartition(target, p = 0.8, list = FALSE)
+
+# Split data into training and test sets
+train_data <- data[train_indices, ]
+test_data <- data[-train_indices, ]
+
+
+# Print the dimensions of the train and test data
+train_dimensions <- dim(train_data)
+test_dimensions <- dim(test_data)
+
+
+print(paste("Train Data Dimensions: Rows =", train_dimensions[1], ", Columns =", train_dimensions[2]))
+print(paste("Test Data Dimensions: Rows =", test_dimensions[1], ", Columns =", test_dimensions[2]))
+
+
+
+```
+
+
+# Training the Decision Tree Model 
+```{r model1, echo=TRUE}
+# List of parameters
+ctrl <- trainControl(method = "cv", 
+                     number = 10, 
+                     search = "random", 
+                     verboseIter = FALSE, 
+                     classProbs = TRUE
+                     )
+
+# List of hyper parameters to loop through
+hyper_grid <- expand.grid(
+  cp = runif(100, min = 0.01, max = 0.5)
+)
+
+
+# Training model
+dt_model <- train(
+  diagnosis ~ .,
+  data = train_data, # Need to recombine features and target for gridsearch
+  method = "rpart",
+  trControl = ctrl,
+  tuneGrid = hyper_grid
+  
+)
+print(dt_model)
+
+```
+
+```{r bestmodel, echo=TRUE}
+# Getting best model
+best_model <- dt_model$finalModel
+# Plotting model
+rpart.plot(best_model, extra = 105)
+```
+## Showing Feature Importance
+```{r featureimport, echo=FALSE}
+feature_importance <- varImp(dt_model)
+print(feature_importance)
+```
+
+## Predict testing Data Based off of Training Model
+```{r confmatrix, echo=TRUE}
+# Predicting new data to see performance
+predictions <- predict(best_model, newdata = test_data, type= 'class')
+
+# Reformatting data to fit confusion matrix
+actual_labels <- factor(test_data$diagnosis, levels = c("B", "M"))
+predicted_labels <- factor(predictions, levels = c("B", "M"))
+
+# Creating confusion matrix
+conf_mat <- confusionMatrix(data = predicted_labels, reference = actual_labels)
+conf_mat
+```
+
+```{r confusion matrix, echo=TRUE, fig.height=5, fig.width=5}
+cm = as.data.frame(conf_mat$table)
+
+conf_plot <- ggplot(data = cm, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), vjust = 1) +
+  labs(x = "Actual", y = "Predicted", title = "Decision Tree Confusion Matrix") +
+  scale_fill_gradient(low = "white", high = "green") +  # Adjust colors as needed
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white"))
+  
+ggsave("./Images/DecisionTree_Confusion_Matrix.png", plot = conf_plot, width = 8, height = 6, dpi = 300)
+conf_plot
+  
+```
+
+```{r importance plot, echo=TRUE, fig.height=5, fig.width=5}
+importance <- as.data.frame(varImp(best_model))
+
+importance_scores <- importance$Overall
+importance_labels <- rownames(importance)
+importance_data <- data.frame(importance_scores, importance_labels)
+
+importance_plot <- ggplot(data = head(importance_data, 6), aes(x = reorder(importance_labels, -importance_scores), y = importance_scores)) + 
+  labs(x = "Variables", y = "Importance", title = "Decision Tree Feature Importance Scores") +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white"))
+  
+ggsave("./Images/DecisionTree_Importance_Plot.png", plot = importance_plot, width = 8, height = 6, dpi = 300)
+importance_plot
+  
+```

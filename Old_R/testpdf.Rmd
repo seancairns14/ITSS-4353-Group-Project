@@ -1,0 +1,30 @@
+---
+title: "FNA Classification"
+author: "Sean Cairns"
+date: "2023-11-16"
+output:
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(readr)
+```
+
+
+```{r pressure, echo=FALSE}
+data <- read_csv("FNA_cancer.csv")
+```
+
+```{r pressure, echo=FALSE}
+
+```
+
+```{r pressure, echo=FALSE}
+
+```
+
+```{r pressure, echo=FALSE}
+
+```
