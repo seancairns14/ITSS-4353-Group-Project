@@ -27,7 +27,8 @@ library(pROC)
 
 
 ```{r summary, echo=FALSE}
-data <- read.csv("FNA_cancer.csv")
+# data <- read.csv("FNA_cancer.csv")
+data <- read.csv(file.choose())
 # The FNA cancer data
 dimensions <- dim(data)
 print(paste("Data Dimensions: Rows =", dimensions[1], ", Columns =", dimensions[2]))
@@ -82,7 +83,7 @@ cor_heatmap <- ggplot(cor_mat, aes(Var1, Var2, fill = value)) +
   labs(title = "Correlation Heatmap between FNA_Cancer Variables",
        x = "Variables",
        y = "Variables")
-ggsave("./Images/cor_heatmap.png", plot = cor_heatmap, width = 8, height = 6, dpi = 300)
+ggsave("cor_heatmap.png", plot = cor_heatmap, width = 8, height = 6, dpi = 300)
 
 cor_heatmap
 ```
@@ -147,11 +148,33 @@ best_model <- dt_model$finalModel
 # Plotting model
 rpart.plot(best_model, extra = 105)
 ```
+
 ## Showing Feature Importance
 ```{r featureimport, echo=FALSE}
 feature_importance <- varImp(dt_model)
 print(feature_importance)
+feature_importance
+
+library(ggplot2)
+feature_importance <- data.frame(
+  Overall = c(100.000000, 98.901050, 94.985587, 92.346482, 91.471239, 8.734776, 7.620765, 0.000000, 0.000000, 0.00000),
+  row.names = c("concave.points_worst", "perimeter_worst", "concave.points_mean", "radius_worst", "area_worst", "concavity_mean", "compactness_worst", "id", "radius_mean", "texture_se")
+)
+
+feature_importance$Variable <- rownames(feature_importance)
+# creating the bar plot 
+feature_importance_plot <- ggplot(data = feature_importance, aes(x = reorder(Variable, -Overall), y = Overall)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(x = "Variables", y = "Importance", title = "Top 10 Feature Importance Scores for Decision Tree Model") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white"))
+
+feature_importance_plot
+
 ```
+
+
 
 ## Predict testing Data Based off of Training Model
 ```{r confmatrix, echo=TRUE}
@@ -230,9 +253,6 @@ binary_predictions <- ifelse(predictions > 0.5, "1", "0")
 # Create a confusion matrix to evaluate the model
 confusion_matrix <- confusionMatrix(as.factor(binary_predictions), test_data$diagnosis)
 
-confusion_matrix
-
-
 ```
 
 ```{r confmatrix plot, echo=TRUE}
@@ -261,7 +281,7 @@ importance_labels <- rownames(importance)
 importance_data <- data.frame(importance_scores, importance_labels)
 
 importance_plot <- ggplot(data = head(importance_data, 6), aes(x = reorder(importance_labels, -importance_scores), y = importance_scores)) + 
-  labs(x = "Variables", y = "Importance", title = "Logistic Feature Importance Scores") +
+  labs(x = "Variables", y = "Importance", title = "Logistic Regression Feature Importance Scores") +
   geom_bar(stat = "identity", fill = "skyblue") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
         plot.background = element_rect(fill = "white"),
