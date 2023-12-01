@@ -21,6 +21,8 @@ library(rpart)
 library(rpart.plot)
 library(caret)
 library(reshape2)
+library(pROC)
+
 ```
 
 
@@ -110,7 +112,7 @@ print(paste("Test Data Dimensions: Rows =", test_dimensions[1], ", Columns =", t
 ```
 
 
-# Training the Decision Tree Model 
+# Decision Tree Model 
 ```{r model1, echo=TRUE}
 # List of parameters
 ctrl <- trainControl(method = "cv", 
@@ -200,4 +202,105 @@ importance_plot <- ggplot(data = head(importance_data, 6), aes(x = reorder(impor
 ggsave("./Images/DecisionTree_Importance_Plot.png", plot = importance_plot, width = 8, height = 6, dpi = 300)
 importance_plot
   
+```
+```{r Logistic ROC plot, echo=TRUE}
+
+# Assuming 'predictions' contains class labels from the decision tree
+# Convert predicted labels to binary probabilities
+predicted_probabilities <- ifelse(predictions == "M", 1, 0)  # Assuming 'M' represents positive class
+
+# Compute ROC curve
+roc_curve <- roc(actual_labels, predicted_probabilities)
+
+# Plot ROC curve using ggplot
+plot(roc_curve)
+```
+
+## Logistic Model
+```{r model2, echo=TRUE}
+# Converting the factor levels to a binary format for logistic regression model
+# 1 = 'M' (malignant) 0 = 'B' (benign)
+train_data$diagnosis <- as.factor(ifelse(train_data$diagnosis == "M", 1, 0))
+test_data$diagnosis <- as.factor(ifelse(test_data$diagnosis == "M", 1, 0))
+
+# Train a logistic regression model using the glm function with binomial family parameter
+logistic_model <- glm(diagnosis ~ ., data = train_data, family = "binomial")
+
+# Summary of the model to view coefficients and statistics
+summary(logistic_model)
+
+
+```
+## Logistical Confusion Matrix
+```{r confusion matrix 2, echo=TRUE}
+# Make predictions on the test data
+predictions <- predict(logistic_model, newdata = test_data, type = "response")
+
+# Convert predicted probabilities to binary predictions based on a 0.5 cutoff
+binary_predictions <- ifelse(predictions > 0.5, "1", "0")
+
+# Create a confusion matrix to evaluate the model
+confusion_matrix <- confusionMatrix(as.factor(binary_predictions), test_data$diagnosis)
+
+```
+
+```{r confmatrix plot, echo=TRUE}
+## PLOTTING CONFUSION MATRIX
+cm = as.data.frame(confusion_matrix$table)
+
+conf_plot <- ggplot(data = cm, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), vjust = 1) +
+  labs(x = "Actual", y = "Predicted", title = "Logistic Regression Confusion Matrix") +
+  scale_fill_gradient(low = "white", high = "green") +  # Adjust colors as needed
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white"))
+ggsave("./Images/Logistic_ConfusionMatrix_Plot.png", plot = importance_plot, width = 8, height = 6, dpi = 300)
+
+print(conf_plot)
+```
+
+```{r logistic Feature Importance plot, echo=TRUE}
+importance <- as.data.frame(varImp(logistic_model))
+
+importance_scores <- importance$Overall
+importance_labels <- rownames(importance)
+importance_data <- data.frame(importance_scores, importance_labels)
+
+importance_plot <- ggplot(data = head(importance_data, 6), aes(x = reorder(importance_labels, -importance_scores), y = importance_scores)) + 
+  labs(x = "Variables", y = "Importance", title = "Logistic Feature Importance Scores") +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white"))
+ggsave("./Images/logistic_Importance_Plot.png", plot = importance_plot, width = 8, height = 6, dpi = 300)
+
+importance_plot
+```
+
+```{r Logistic ROC plot, echo=TRUE}
+# Defining classes
+binary_predictions <- ifelse(predictions > 0.5, "M", "B")
+# Coping feature diagnosis
+test_data$diagnosis_binary <- test_data$diagnosis
+
+# Creating ROC curve from test and prediction datasets
+roc_curve <- roc(test_data$diagnosis_binary, as.numeric(binary_predictions == "M"))
+
+# or use plot(roc_curve) to plot curve
+
+# creating dataframes to be used in ggplot
+roc_df <- data.frame(
+  FPR = roc_curve$specificities,
+  TPR = roc_curve$sensitivities
+)
+
+ggplot(roc_df, aes(x = FPR, y = TPR)) +
+  geom_line(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +  
+  labs(title = "Receiver Operating Characteristic (ROC) Curve", x = "False Positive Rate (1 - Specificity)", y = "True Positive Rate (Sensitivity)") +
+  theme_minimal()
+
 ```
