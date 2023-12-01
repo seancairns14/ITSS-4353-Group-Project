@@ -82,7 +82,7 @@ cor_heatmap <- ggplot(cor_mat, aes(Var1, Var2, fill = value)) +
   labs(title = "Correlation Heatmap between FNA_Cancer Variables",
        x = "Variables",
        y = "Variables")
-ggsave("cor_heatmap.png", plot = cor_heatmap, width = 8, height = 6, dpi = 300)
+ggsave("./Images/cor_heatmap.png", plot = cor_heatmap, width = 8, height = 6, dpi = 300)
 
 cor_heatmap
 ```
@@ -203,7 +203,7 @@ ggsave("./Images/DecisionTree_Importance_Plot.png", plot = importance_plot, widt
 importance_plot
   
 ```
-```{r Logistic ROC plot, echo=TRUE}
+```{r Decision Tree ROC plot, echo=TRUE}
 
 # Assuming 'predictions' contains class labels from the decision tree
 # Convert predicted labels to binary probabilities
